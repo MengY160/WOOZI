@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 技能五子棋</title>
+    <style>
+        :root { 
+            --board-bg: #e3c18d; 
+            --line-color: #333; 
+            --primary-color: #ef5350;
+        }
+        body { 
+            font-family: 'Microsoft JhengHei', sans-serif; 
+            background: #f4f7f6; 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh;
+        }
+        
+        /* 開始畫面 */
+        #start-screen { 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.95); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 1000; 
+            text-align: center; 
+        }
+        .info-card { 
+            background: #1a1a1a; 
+            padding: 40px; 
+            border-radius: 20px; 
+            border: 2px solid var(--primary-color); 
+            max-width: 600px; 
+            box-shadow: 0 0 30px rgba(239, 83, 80, 0.4); 
+        }
+        
+        /* 遊戲區域 */
+        #game-area { margin-top: 20px; text-align: center; }
+        #status-bar {
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 300px;
+        }
+
+        /* 棋盤樣式 */
+        #board { 
+            position: relative; 
+            width: 448px; 
+            height: 448px; 
+            background: var(--board-bg); 
+            border: 2px solid #5d4037; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+            cursor: default;
+        }
+        #board.active { cursor: crosshair; } /* 獲得權限時改變鼠標 */
+
+        .line { position: absolute; background: var(--line-color); }
+        .h-line { height: 1px; width: 420px; left: 14px; }
+        .v-line { width: 1px; height: 420px; top: 14px; }
+        
+        /* 棋子與感應點 */
+        .intersection { 
+            position: absolute; 
+            width: 30px; 
+            height: 30px; 
+            transform: translate(-15px, -15px); 
+            z-index: 5; 
+            border-radius: 50%; 
+        }
+        .piece { 
+            position: absolute; 
+            width: 26px; 
+            height: 26px; 
+            border-radius: 50%; 
+            transform: translate(-13px, -13px); 
+            z-index: 10; 
+            pointer-events: none; 
+        }
+        .black { background: radial-gradient(circle at 30% 30%, #444, #000); box-shadow: 1px 2px 4px rgba(0,0,0,0.4); }
+        .white { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #999; box-shadow: 1px 2px 4px rgba(0,0,0,0.2); }
+
+        /* 題目彈窗 */
+        #quiz-overlay { 
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.85); 
+            z-index: 2000; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        #quiz-box { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px; 
+            width: 90%; 
+            max-width: 500px; 
+            text-align: center; 
+            box-shadow: 0 15px 50px rgba(0,0,0,0.5);
+        }
+        .opt-btn { 
+            width: 100%; 
+            padding: 14px; 
+            margin: 10px 0; 
+            border: 2px solid #eee; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            background: #fff; 
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        .opt-btn:hover { background: #f0f9ff; border-color: #3498db; color: #3498db; }
+        
+        /* 控制介面 */
+        .controls { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+        button.ctrl-btn { 
+            padding: 10px 15px; 
+            border-radius: 8px; 
+            border: none; 
+            cursor: pointer; 
+            background: #34495e; 
+            color: white; 
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        button.ctrl-btn:hover { background: #2c3e50; transform: translateY(-2px); }
+        button.re-btn { background: var(--primary-color); }
+        button.re-btn:hover { background: #d32f2f; }
+    </style>
+</head>
+<body>
+
+<audio id="bgm" loop>
+    <source src="技能五子棋小聲.mp3" type="audio/mpeg">
+</audio>
+
+<div id="start-screen">
+    <div class="info-card">
+        <h1 style="color: var(--primary-color); font-size: 2.5rem;">🔥 技能五子棋</h1>
+        <h2 style="margin-bottom: 25px;">健康知識挑戰</h2>
+        <div style="text-align: left; background: #222; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+	    <p>飛砂走石、力拔山兮，這是一場靠健康取勝的五子棋。</p>
+            <p>1. 每個回合開始，會彈出隨機健康題目。</p>
+            <p>2. <b>答對題目</b>：獲得該回合落子權，可點擊棋盤。</p>
+            <p>3. <b>答錯題目</b>：直接跳過回合，由對方落子。</p>
+            <p>4. 先連成五子者獲得最終勝利！</p>
+        </div>
+        <button onclick="startGame()" style="background:var(--primary-color); color:white; padding:18px 60px; border:none; border-radius:12px; font-size:22px; cursor:pointer; font-weight:bold; box-shadow: 0 5px 15px rgba(239, 83, 80, 0.4);">開始對弈</button>
+    </div>
+</div>
+
+<div id="game-area">
+    <div id="status-bar">點擊「開始對弈」以啟動</div>
+    <div id="board"></div>
+    <div class="controls">
+        <button class="ctrl-btn re-btn" onclick="resetBoard()">重新挑戰</button>
+        <button class="ctrl-btn" onclick="resetGame()">重設棋盤</button>
+        <button class="ctrl-btn" onclick="toggleMode()" id="mode-btn">模式：電腦對戰</button>
+        <button class="ctrl-btn" onclick="toggleMusic()" id="music-btn">🎵 音樂：關閉</button>
+    </div>
+</div>
+
+<div id="quiz-overlay">
+    <div id="quiz-box">
+        <div style="color: #3498db; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; letter-spacing: 2px;">QUESTION</div>
+        <h3 id="q-text" style="margin-bottom: 25px; line-height: 1.5; color: #333;">載入中...</h3>
+        <div id="opt-container"></div>
+    </div>
+</div>
+
+<script>
+    // --- 完整大題庫 ---
+    const QUESTIONS = [
+        {"q": "下列哪一種維生素屬於脂溶性，且具有抗氧化作用並能維持生殖功能？", "a": "維生素 E", "o": ["維生素 C", "維生素 E", "維生素 B12", "維生素 B6"]},
+    {"q": "有關人體攝取膳食纖維的敘述，下列何者錯誤？", "a": "主要來源是肉類", "o": ["可預防便秘", "可增加飽足感", "主要來源是肉類", "可降低大腸癌風險"]},
+    {"q": "下列何者為人體最主要的熱量來源？", "a": "醣類", "o": ["蛋白質", "醣類", "脂質", "維生素"]},
+    {"q": "有關「肥胖」與疾病的關係，下列敘述何者錯誤？", "a": "完全與遺傳無關", "o": ["易導致代謝性疾病", "增加心血管疾病風險", "易引起退化性關節炎", "完全與遺傳無關"]},
+    {"q": "根據衛生福利部標準，成年人 BMI 達到多少即定義為「肥胖」？", "a": "27", "o": ["18.5", "24", "27", "30"]},
+    {"q": "下列哪一種礦物質與紅血球合成血紅素最直接相關？", "a": "鐵", "o": ["鐵", "鈣", "鎂", "鋅"]},
+    {"q": "有關菸害防制法的規定，下列何者正確？", "a": "三人以上室內工作場所禁止吸菸", "o": ["未滿 18 歲不得吸菸", "三人以上室內工作場所禁止吸菸", "餐廳全面可以吸菸", "校園內可以設吸菸區"]},
+    {"q": "檳榔中導致癌症最主要的成分是？", "a": "檳榔鹼", "o": ["檳榔纖維", "石灰", "荖花", "檳榔鹼"]},
+    {"q": "有關酗酒對身體的危害，下列何者錯誤？", "a": "增加骨質密度", "o": ["引起脂肪肝", "造成大腦功能受損", "增加骨質密度", "引發胃潰瘍"]},
+    {"q": "長期施用 K 他命 最容易對哪一個器官造成永久性損傷？", "a": "膀胱", "o": ["膀胱", "心臟", "皮膚", "指甲"]},
+    {"q": "下列何種藥物被歸類為「中樞神經興奮劑」？", "a": "安非他命", "o": ["嗎啡", "安非他命", "海洛因", "酒精"]},
+    {"q": "有關愛滋病 (AIDS) 的傳染途徑，下列何者正確？", "a": "危險性行為", "o": ["共用餐具", "蚊蟲叮咬", "危險性行為", "一起游泳"]},
+    {"q": "目前台灣政府提供的免費大腸癌篩檢，主要是檢測下列何者？", "a": "糞便潛血反應", "o": ["糞便潛血反應", "大腸鏡檢查", "抽血驗癌指數", "電腦斷層"]},
+    {"q": "急性心臟病發作、呼吸困難的傷患，最適宜採用的姿勢為何？", "a": "半坐臥", "o": ["平躺", "側躺", "半坐臥", "復甦姿勢"]},
+    {"q": "處理中暑患者的首要原則為何？", "a": "搬移至陰涼通風處", "o": ["立即給予冰水飲用", "搬移至陰涼通風處", "用力按摩四肢", "餵食退燒藥"]},
+    {"q": "發現有人溺水時，第一時間應先採取的行動是？", "a": "大聲呼救並撥打 119", "o": ["大聲呼救並撥打 119", "立即跳入水中救人", "在岸上等待", "不予理會"]},
+    {"q": "成人生命之鏈的四個環節順序，下列何者正確？ (甲、求救 乙、CPR 戊、去顫 丁、高級救命術)", "a": "甲乙戊丁", "o": ["甲乙丁戊", "丙乙戊丁", "乙甲丙丁", "甲乙戊丁"]},
+    {"q": "執行單人成人 CPR 時，胸部按壓與人工呼吸的比率為何？", "a": "30 : 2", "o": ["30 : 2", "15 : 2", "5 : 1", "20 : 2"]},
+    {"q": "使用 AED 時，當儀器分析完心律後，若提示「不建議電擊」，應如何處理？", "a": "持續進行 CPR", "o": ["關閉電源", "收拾器材離開", "持續進行 CPR", "檢查呼吸即可"]},
+    {"q": "實施胸部心臟按壓時，掌根下壓胸骨的深度應為何？", "a": "大約 5 公分", "o": ["1~2 公分", "大約 5 公分", "7~8 公分", "11~12 公分"]},
+    {"q": "有關壓力調適的方法，下列何者較不適當？", "a": "透過暴飲暴食解決", "o": ["運動紓壓", "尋求專業諮商", "學習放鬆技巧", "透過暴飲暴食解決"]},
+    {"q": "憂鬱症常見的臨床症狀不包括下列何者？", "a": "注意力極度集中", "o": ["注意力極度集中", "食慾改變", "睡眠障礙", "對事物失去興趣"]},
+    {"q": "對於有自殺傾向的朋友，下列哪種做法是正確的？", "a": "陪伴並傾聽，轉介專業機構", "o": ["認為他在開玩笑", "叫他不要想太多", "陪伴並傾聽，轉介專業機構", "替他保守秘密，不告訴任何人"]},
+    {"q": "下列何者屬於思覺失調症的陽性症狀？", "a": "幻覺與妄想", "o": ["社交退縮", "幻覺與妄想", "思考貧乏", "情緒平淡"]},
+    {"q": "有關避孕方法的有效性，下列何者在正確使用下避孕率最高？", "a": "口服避孕藥", "o": ["口服避孕藥", "安全期法", "性交中斷法", "清洗陰道"]},
+    {"q": "下列何種性病是由病毒引起且目前尚無根治藥物？", "a": "生殖器疱疹", "o": ["淋病", "梅毒", "披衣菌感染", "生殖器疱疹"]},
+    {"q": "有關青春期女性初經的敘述，下列何者正確？", "a": "初經後一兩年內週期不規律是常見的", "o": ["初經代表已完全發育成熟", "月經週期固定是正常現象", "初經後一兩年內週期不規律是常見的", "月經期間不能運動"]},
+    {"q": "根據 WHO 定義，健康的內涵包括生理、心理以及哪一方面的完好狀態？", "a": "社會", "o": ["財富", "社會", "地位", "智力"]},
+    {"q": "下列哪一項不是台灣全民健康保險的特性？", "a": "自由自由投保", "o": ["自由自由投保", "強制性投保", "量能負擔", "社會保險"]},
+    {"q": "家庭對個人健康的影響不包括？", "a": "決定個人學歷", "o": ["提供情緒支持", "養成生活習慣", "疾病遺傳因素", "決定個人學歷"]},
+    {"q": "關於老化現象，下列敘述何者正確？", "a": "器官功能逐漸衰退", "o": ["老化只發生在 65 歲以後", "視力會變好", "器官功能逐漸衰退", "智力會迅速消失"]},
+    {"q": "為了預防骨質疏鬆症，應在年輕時多補充哪種營養素？", "a": "鈣與維生素 D", "o": ["維生素 C", "鈣與維生素 D", "鐵", "脂肪"]},
+    {"q": "下列何者是全球暖化產生的直接影響？", "a": "海平面上升", "o": ["海平面上升", "地震頻率增加", "空氣中氮氣增加", "礦產枯竭"]},
+    {"q": "垃圾分類中，廢乾電池應屬於哪一類？", "a": "資源回收", "o": ["一般垃圾", "廚餘", "資源回收", "直接丟棄"]},
+    {"q": "有關職業安全，勞工在噪音環境工作應配戴？", "a": "耳罩", "o": ["口罩", "手套", "護目鏡", "耳罩"]},
+    {"q": "下列哪一種疾病不是透過飛沫傳染？", "a": "愛滋病", "o": ["流行性感誤", "愛滋病", "肺結核", "百日咳"]},
+    {"q": "洗手五步驟正確順序為何？", "a": "濕、搓、沖、捧、擦", "o": ["搓、濕、沖、捧、擦", "濕、沖、搓、捧、擦", "濕、搓、沖、捧、擦", "搓、沖、濕、捧、擦"]},
+    {"q": "預防傳染病最經濟有效的方法是？", "a": "接種疫苗", "o": ["接種疫苗", "每天吃抗生素", "不出門", "多喝咖啡"]},
+    {"q": "有關視力保健「3010」原則是指？", "a": "保持 30 公分距離看 10 分鐘", "o": ["看電視 30 公分看 10 分鐘", "每 30 天檢查一次視力 10 分鐘", "閱讀 30 分鐘休息 10 分鐘", "保持 30 公分距離看 10 分鐘"]},
+    {"q": "近視最主要的原因是眼軸過長導致物體成像在網膜的？", "a": "前方", "o": ["後方", "前方", "正中央", "盲點"]},
+    {"q": "有關口腔保健，建議多久進行一次牙齒定期檢查？", "a": "半年", "o": ["半年", "一年", "兩年", "不用檢查"]},
+    {"q": "造成酸雨的主要空氣污染物是？", "a": "硫氧化物與氮氧化物", "o": ["二氧化碳", "氟氯碳化物", "硫氧化物與氮氧化物", "氧氣"]},
+    {"q": "$PM_{2.5}$ 是空氣污染指標之一，下列有關敘述何者錯誤？", "a": "容易被氣管纖毛 and 鼻腔過濾", "o": ["直徑小於或等於 2.5 微米", "稱為細懸浮粒子", "容易被氣管纖毛 and 鼻腔過濾", "WHO 目標為 10 微克"]},
+    {"q": "長期飲用含砷量過高的水，易導致下列哪種地方性疾病？", "a": "烏腳病", "o": ["水俁病", "烏腳病", "痛痛病", "甲狀腺腫"]},
+    {"q": "有關食品添加物的敘述，何者錯誤？", "a": "可以完全取代天然食材營養", "o": ["需經過核准才可使用", "目的在防腐或增進色香味", "過量可能危害健康", "可以完全取代天然食材營養"]},
+    {"q": "預防食物中毒，食物加熱應達到中心溫度幾度以上較為安全？", "a": "75 度", "o": ["50 度", "60 度", "75 度", "100 度"]},
+    {"q": "有關「均衡飲食」中六大類食物，不包括下列哪一類？", "a": "含糖飲料類", "o": ["油脂類", "含糖飲料類", "全穀雜糧類", "乳品類"]},
+    {"q": "每日建議運動時間，青少年應至少達到？", "a": "60 分鐘", "o": ["10 分鐘", "20 分鐘", "30 分鐘", "60 分鐘"]},
+    {"q": "運動後適當的「伸展」主要是為了？", "a": "預防肌肉痠痛與傷害", "o": ["預防肌肉痠痛與傷害", "增加心肺耐力", "爆發力訓練", "減少熱量消耗"]},
+    {"q": "下列何者不是「體適能」的要素？", "a": "反應速度", "o": ["心肺耐力", "肌力與肌耐力", "反應速度", "柔軟度"]},
+    {"q": "測量「柔軟度」常用的方法是？", "a": "坐姿體前彎", "o": ["立定跳遠", "坐姿體前彎", "一分鐘仰臥起坐", "800 公尺跑走"]},
+    {"q": "有關中老年人運動建議，下列何者錯誤？", "a": "挑戰極限高強度", "o": ["應採循序漸進", "注意環境安全", "選擇低衝擊運動", "挑戰極限高強度"]},
+    {"q": "健康促進的核心目標在於？", "a": "提升民眾控制與改善自身健康的能力", "o": ["提升民眾控制與改善自身健康的能力", "單純治癒疾病", "增加醫院營收", "降低人口出生率"]},
+    {"q": "下列哪一項關於壓力的描述錯誤？", "a": "每個人對於壓力的反應相同，都會對身心健康產生不良影響", "o": ["壓力的反應和個人對壓力事件的解釋有關", "壓力是一種調適的過程", "壓力反應可分生理心理社會向度", "每個人對於壓力的反應相同，都會對身心健康產生不良影響"]},
+    {"q": "下列關於「第一型糖尿病」的敘述，何者正確？", "a": "患者體內人體胰臟中的胰島素合成細胞(β細胞)被破壞", "o": ["多發生在中老年人群族", "95%的糖尿病患屬於此類型", "患者體內人體胰臟中的胰島素合成細胞(β細胞)被破壞", "肥胖者為此類型的高危險群"]},
+    {"q": "下列何種病原體喜好侵犯咽喉，而易造成腎臟病變？", "a": "鏈球菌", "o": ["結核菌", "鏈球菌", "大腸桿菌", "沙門氏菌"]},
+    {"q": "有關於腦中風的敘述，下列何者正確？", "a": "發病的前兆包括突然的肢體麻木", "o": ["又稱為冠心病", "有「隱形殺手」之稱", "發病的前兆包括突然的肢體麻木", "治療黃金時段為發病後五小時內"]},
+    {"q": "有關狂犬病的敘述，下列何者正確？", "a": "被疑似狂犬病動物抓咬傷後，立即施打疫苗，預防效果好", "o": ["狂犬病是被螺旋菌抓咬造成", "立即清水沖洗就能避免感染", "發現死亡動物撥打專線通報", "被疑似狂犬病動物抓咬傷後，立即施打疫苗，預防效果好"]},
+    {"q": "有關台灣登革熱之流行，下列敘述何者不正確？", "a": "布氏指數是指調查住宅之積水容器中所含之幼蟲數", "o": ["白線斑蚊廣佈於全台", "主要孳生於容器積水中", "每年 9 月病例達到高峰期", "布氏指數是指調查住宅之積水容器中所含之幼蟲數"]},
+    {"q": "關於潔牙，下列何種方式較不適切？", "a": "刷牙時，要選擇大面積的牙刷，這樣才能將牙菌斑清除乾淨", "o": ["刷牙時兩顆兩顆來回刷", "牙刷刷毛與牙齒呈 45-60 度", "刷牙時，要選擇大面積的牙刷，這樣才能將牙菌斑清除乾淨", "使用牙線以拉鋸方式進入牙縫"]},
+    {"q": "下列何者又稱為陽光型維生素？", "a": "維生素D", "o": ["維生素A", "維生素D", "維生素E", "維生素K"]},
+    {"q": "常見的耳朵清潔與疾病，下列敘述何者錯誤？", "a": "眩暈是中耳的平衡系統出了問題", "o": ["耳垢由外耳道皮膚分泌", "耳黴菌常因水滯留引起", "眩暈是中耳的平衡系統出了問題", "急性中耳炎常因感冒引起"]},
+    {"q": "下列哪一種飲品最容易導致鈣質流失？", "a": "濃縮咖啡或碳酸飲料", "o": ["豆漿", "鮮奶", "濃縮咖啡或碳酸飲料", "白開水"]},
+    {"q": "根據國民飲食指標，建議每天應攝取多少份蔬菜？", "a": "3-5 份", "o": ["3-5 份", "1-2 份", "10 份", "隨意攝取"]},
+    {"q": "下列哪種烹飪方式最能保留蔬菜的營養成分？", "a": "快炒或水煮", "o": ["油炸", "快炒或水煮", "長時間燉煮", "醃漬"]},
+    {"q": "關於「全穀雜糧類」，下列何者不屬於此類？", "a": "雞蛋", "o": ["地瓜", "糙米", "玉米", "雞蛋"]},
+    {"q": "預防高血壓的飲食原則建議「三少一多」，其中「三少」是指？", "a": "少鹽、少油、少糖", "o": ["少鹽、少油、少糖", "少吃魚、少吃肉、少吃菜", "少走路、少流汗、少運動", "少睡覺、少喝水、少說話"]},
+    {"q": "請問喝果汁是否可以完全取代吃新鮮水果？", "a": "不可以，果汁通常缺乏纖維且含糖量高", "o": ["可以，營養完全一樣", "不可以，果汁通常缺乏纖維且含糖量高", "可以，且更好吸收", "視果汁品牌而定"]},
+    {"q": "貧血患者除了補鐵，搭配哪種維生素可增加鐵質吸收？", "a": "維生素 C", "o": ["維生素 A", "維生素 B", "維生素 D", "維生素 C"]},
+    {"q": "下列哪一種油脂含有較多不飽和脂肪酸，對心血管較健康？", "a": "植物油（如橄欖油）", "o": ["植物油（如橄欖油）", "豬油", "奶油", "椰子油"]},
+    {"q": "正確的洗手方式，搓揉時間應至少持續多久？", "a": "20 秒", "o": ["5 秒", "10 秒", "20 秒", "60 秒"]},
+    {"q": "關於睡眠，成年人每天建議的平均睡眠時間為何？", "a": "7-8 小時", "o": ["4 小時", "7-8 小時", "12 小時", "越多越好"]},
+    {"q": "紫外線指數過高時，主要會對人體哪個部分造成直接傷害？", "a": "皮膚與眼睛", "o": ["皮膚與眼睛", "肝臟", "骨骼", "呼吸道"]},
+    {"q": "關於「防曬」，下列敘述何者正確？", "a": "陽光強烈時應利用遮陽傘或衣物遮蔽", "o": ["只有夏天需要", "陰天不需要", "陽光強烈時應利用遮陽傘或衣物遮蔽", "擦了防曬油可曝曬整天"]},
+    {"q": "正常成年人在靜止狀態下的每分鐘心跳數大約是多少？", "a": "60-100 次", "o": ["30-40 次", "150-180 次", "60-100 次", "10-20 次"]},
+    {"q": "為了保護視力，看螢幕時應保持多少距離？", "a": "30-50 公分", "o": ["10 公分", "30-50 公分", "5 公尺", "距離不重要"]},
+    {"q": "關於口腔清潔，牙刷應該多久更換一次？", "a": "3 個月左右或刷毛開花時", "o": ["3 個月左右或刷毛開花時", "半年", "一年", "等到手把壞掉"]},
+    {"q": "使用含氟牙膏主要是為了？", "a": "預防齲齒", "o": ["讓口氣清新", "美白牙齒", "預防齲齒", "止痛"]},
+    {"q": "定期洗牙的主要目的是清除？", "a": "牙結石", "o": ["食物殘渣", "牙結石", "琺瑯質", "牙齒上的色澤"]},
+    {"q": "嬰幼兒睡前喝奶如果不潔牙，容易造成？", "a": "奶瓶性齲齒", "o": ["奶瓶性齲齒", "長不出牙齒", "牙齒過大", "牙齒變紅"]},
+    {"q": "充足的睡眠對心理健康最重要的功能是？", "a": "情緒調節與大腦修復", "o": ["情緒調節與大腦修復", "消耗多餘熱量", "增加社交時間", "美白"]},
+    {"q": "遇到有人發生火災燒燙傷時，正確的急救順序為何？", "a": "沖、脫、泡、蓋、送", "o": ["沖、脫、泡、蓋、送", "脫、沖、泡、蓋、送", "沖、脫、泡、蓋、送", "沖、蓋、泡、脫、送"]},
+    {"q": "使用 AED 時，貼片應貼在患者的什麼位置？", "a": "右上方胸部與左下方側胸", "o": ["左右胸部", "右上方胸部與左下方側胸", "背後兩側", "肚子兩側"]},
+    {"q": "異物卡在氣管（噎到）時，應採取哪種急救法？", "a": "哈姆立克法", "o": ["哈姆立克法", "CPR", "人工呼吸", "拍背法"]},
+    {"q": "發生小擦傷時，初步處理的第一步是？", "a": "用乾淨流動的水清洗傷口", "o": ["直接塗抹紅藥水", "熱敷搓揉", "用乾淨流動的水清洗傷口", "立即包紮止血"]},
+    {"q": "若發現疑似有人一氧化碳中毒，第一步應做什麼？", "a": "打開門窗通風並移至空氣新鮮處", "o": ["打開門窗通風並移至空氣新鮮處", "立即撥打緊急求助電話", "進行CPR", "補充大量水分"]},
+    {"q": "有關「代謝症候群」的判定標準，下列哪項數值異常是其中之一？", "a": "腹部肥胖（男≧90cm，女≧80cm）", "o": ["視力模糊", "腹部肥胖（男≧90cm，女≧80cm）", "每日排便次數", "體溫高低"]},
+    {"q": "關於「肌少症」的敘述，下列何者正確？", "a": "會增加跌倒、骨折及失能的風險", "o": ["會增加跌倒、骨折及失能的風險", "只有瘦的人才會得到", "靠散步就能完全預防", "年紀大肌肉流失是必然的"]},
+    {"q": "關於心肌梗塞的「非典型症狀」，下列何者較常出現在女性或高齡者身上？", "a": "無名疲累、噁心或胃痛感", "o": ["胸口劇烈絞痛", "左手臂麻木", "無名疲累、噁心或胃痛感", "牙痛"]},
+    {"q": "預防大腸癌的「糞便潛血檢查」若呈現陽性反應，後續應優先進行哪項處置？", "a": "預約大腸鏡檢查", "o": ["隔月再驗一次", "開始吃素", "服用止瀉藥", "預約大腸鏡檢查"]},
+    {"q": "關於「帶狀疱疹」（俗稱皮蛇）的敘述，下列何者正確？", "a": "是由水痘病毒復發引起的", "o": ["是由水痘病毒復發引起的", "只要塗抹草藥就能根治", "一輩子只會得一次", "只有年輕人才會得"]},
+    {"q": "有關洗腎的最主要原因，在台灣排名第一位的是？", "a": "糖尿病控制不良", "o": ["亂吃成藥", "糖尿病控制不良", "喝水太少", "遺傳"]},
+    {"q": "判斷中風的「FAST」口訣中，「S (Speech)」代表觀察患者是否有什麼症狀？", "a": "說話含糊不清或無法表達", "o": ["失去記憶", "說話太大聲", "說話含糊不清或無法表達", "唱歌走音"]},
+    {"q": "關於「子宮頸癌預防疫苗」（HPV 疫苗），下列敘述何者正確？", "a": "男性施打可預防口咽癌與尖銳濕疣（菜花）", "o": ["只有女性需要施打", "男性施打可預防口咽癌與尖銳濕疣（菜花）", "打過疫苗就不需抹片檢查", "超過 30 歲打就完全沒效"]},
+    {"q": "有關「幽門螺桿菌」的敘述，下列何者正確？", "a": "它是導致胃潰瘍與胃癌的主要危險因子", "o": ["只會引起普通腹瀉", "它是透過空氣傳染的", "每個人體內都有", "它是導致胃潰瘍與胃癌的主要危險因子"]},
+    {"q": "關於抗藥性與抗生素使用，何者正確？", "a": "隨意停藥會使殘存細菌演化出抗藥性", "o": ["症狀消失即可停藥", "隨意停藥會使殘存細菌演化出抗藥性", "抗生素可用於治療病毒感冒", "抗藥性只發生在服藥者身上"]},
+    {"q": "判斷「糖尿病預後」最重要的長期監測指標為何？", "a": "糖化血色素（HbA1c）", "o": ["糖化血色素（HbA1c）", "單次餐後血糖", "尿液酸鹼值", "體重增減"]},
+    {"q": "關於痛風與「尿酸」的代謝，下列敘述何者正確？", "a": "約 70% 的尿酸是由腎臟隨尿液排出", "o": ["尿酸完全由飲食產生", "尿酸高痛風一定發作", "約 70% 的尿酸是由腎臟隨尿液排出", "不吃海鮮尿酸就正常"]},
+    {"q": "有關痛風急性發作期的處置，下列何者「錯誤」？", "a": "應立刻自行增加降尿酸藥物劑量", "o": ["應立刻自行增加降尿酸藥物劑量", "應遵醫囑使用消炎止痛藥", "局部冰敷有助緩解疼痛", "應大量飲水促進排泄"]},
+    {"q": "長期未控制的高尿酸血症，除了痛風外最易引發哪種器官損傷？", "a": "腎結石與慢性腎衰竭", "o": ["視網膜病變", "慢性阻塞性肺病", "聽力受損", "腎結石與慢性腎衰竭"]}
+];
+
+    const boardSize = 15;
+    let board = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
+    let usedIndices = []; // 紀錄已使用的題目索引
+    let currentPlayer = 1; // 1: 黑子(玩家), 2: 白子(電腦)
+    let isPVE = true;
+    let canPlacePiece = false; // 落子權限開關
+    let isMusicPlaying = false;
+
+    const bgm = document.getElementById('bgm');
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status-bar');
+
+    // --- 音樂與初始化 ---
+    function toggleMusic() {
+        if (isMusicPlaying) {
+            bgm.pause();
+            document.getElementById('music-btn').innerText = "🎵 音樂：關閉";
+        } else {
+            bgm.play().catch(() => alert("請先與頁面互動以播放音樂"));
+            document.getElementById('music-btn').innerText = "🎵 音樂：播放中";
+        }
+        isMusicPlaying = !isMusicPlaying;
+    }
+
+    function startGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        bgm.play().then(() => {
+            isMusicPlaying = true;
+            document.getElementById('music-btn').innerText = "🎵 音樂：播放中";
+        }).catch(() => {});
+        resetBoard();
+    }
+
+    // --- 棋盤邏輯 ---
+    function drawBoard() {
+        boardEl.innerHTML = '';
+        for(let i=0; i<boardSize; i++) {
+            const h = document.createElement('div'); h.className = 'line h-line'; h.style.top = `${28 + i * 28}px`; boardEl.appendChild(h);
+            const v = document.createElement('div'); v.className = 'line v-line'; v.style.left = `${28 + i * 28}px`; boardEl.appendChild(v);
+        }
+        for(let r=0; r<boardSize; r++) {
+            for(let c=0; c<boardSize; c++) {
+                const inter = document.createElement('div');
+                inter.className = 'intersection';
+                inter.style.top = `${28 + r * 28}px`;
+                inter.style.left = `${28 + c * 28}px`;
+                inter.onclick = () => handleCellClick(r, c);
+                boardEl.appendChild(inter);
+                if(board[r][c] !== 0) {
+                    const p = document.createElement('div');
+                    p.className = `piece ${board[r][c] === 1 ? 'black' : 'white'}`;
+                    p.style.top = `${28 + r * 28}px`;
+                    p.style.left = `${28 + c * 28}px`;
+                    boardEl.appendChild(p);
+                }
+            }
+        }
+    }
+
+    function handleCellClick(r, c) {
+        if (board[r][c] !== 0) return;
+        if (!canPlacePiece) {
+            alert("請先正確回答題目以獲取落子權！");
+            return;
+        }
+        placePiece(r, c);
+    }
+
+    // --- 回合控管 ---
+    function nextTurn() {
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        canPlacePiece = false;
+        boardEl.classList.remove('active');
+
+        if (currentPlayer === 1) {
+            statusEl.innerText = "🔴 請回答問題以獲取【黑子】落子權...";
+            setTimeout(popQuiz, 600);
+        } else {
+            if (isPVE) {
+                statusEl.innerText = "🤖 電腦(白子)正在思考...";
+                setTimeout(aiThink, 1000);
+            } else {
+                statusEl.innerText = "⚪ 請回答問題以獲取【白子】落子權...";
+                setTimeout(popQuiz, 600);
+            }
+        }
+    }
+
+    // --- 問答機制 (隨機且不重複) ---
+    function popQuiz() {
+        // 篩選出尚未使用的題目索引
+        let available = QUESTIONS.map((_, i) => i).filter(i => !usedIndices.includes(i));
+        
+        // 如果題目用完了，則重置題庫
+        if(available.length === 0) { 
+            usedIndices = []; 
+            available = QUESTIONS.map((_, i) => i); 
+        }
+        
+        // 隨機選取一個未使用的索引
+        const idx = available[Math.floor(Math.random() * available.length)];
+        usedIndices.push(idx); // 加入已使用清單
+        const quiz = QUESTIONS[idx];
+
+        document.getElementById('quiz-overlay').style.display = 'flex';
+        document.getElementById('q-text').innerText = quiz.q;
+        
+        const container = document.getElementById('opt-container');
+        container.innerHTML = '';
+
+        // 隨機排列選項 (讓選項順序也隨機)
+        let options = [...quiz.o].sort(() => Math.random() - 0.5);
+
+        options.forEach(opt => {
+            const b = document.createElement('button');
+            b.className = 'opt-btn';
+            b.innerText = opt;
+            b.onclick = () => {
+                document.getElementById('quiz-overlay').style.display = 'none';
+                if(opt === quiz.a) {
+                    canPlacePiece = true;
+                    boardEl.classList.add('active');
+                    statusEl.innerText = `✅ 答對了！請在棋盤落子 (${currentPlayer === 1 ? '黑' : '白'})`;
+                } else {
+                    alert(`❌ 答錯了！正確答案是：【${quiz.a}】\n你失去了本回合的落子權。`);
+                    nextTurn();
+                }
+            };
+            container.appendChild(b);
+        });
+    }
+
+    function placePiece(r, c) {
+        board[r][c] = currentPlayer;
+        drawBoard();
+        if(checkWin(r, c, currentPlayer)) {
+            setTimeout(() => { 
+                alert(currentPlayer === 1 ? "🎉 恭喜黑子獲勝！" : "⚪ 白子獲勝了！"); 
+                // 獲勝後不自動重置，讓玩家看清楚棋盤，並點擊「重新挑戰」
+                statusEl.innerText = "🏆 遊戲結束！點擊「重新挑戰」再玩一次。";
+                canPlacePiece = false;
+                boardEl.classList.remove('active');
+            }, 100);
+            return;
+        }
+        nextTurn();
+    }
+
+    // --- AI 與 勝負判斷 ---
+    function aiThink() {
+        let bestScore = -1;
+        let candidates = [];
+        for(let r=0; r<boardSize; r++) {
+            for(let c=0; c<boardSize; c++) {
+                if(board[r][c] === 0) {
+                    let score = evaluatePoint(r, c);
+                    if(score > bestScore) { bestScore = score; candidates = [{r, c}]; }
+                    else if (score === bestScore) { candidates.push({r, c}); }
+                }
+            }
+        }
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        placePiece(pick.r, pick.c);
+    }
+
+    function evaluatePoint(r, c) {
+        return Math.max(getLineScore(r, c, 2) * 1.1, getLineScore(r, c, 1));
+    }
+
+    function getLineScore(r, c, p) {
+        let total = 0;
+        const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+        for(let [dr, dc] of dirs) {
+            let count = 1;
+            for(let i=1; i<5; i++) {
+                let nr=r+dr*i, nc=c+dc*i;
+                if(nr>=0 && nr<boardSize && nc>=0 && nc<boardSize && board[nr][nc] === p) count++; else break;
+            }
+            for(let i=1; i<5; i++) {
+                let nr=r-dr*i, nc=c-dc*i;
+                if(nr>=0 && nr<boardSize && nc>=0 && nc<boardSize && board[nr][nc] === p) count++; else break;
+            }
+            if(count >= 5) total += 10000;
+            else if(count === 4) total += 1000;
+            else if(count === 3) total += 100;
+            else if(count === 2) total += 10;
+        }
+        return total;
+    }
+
+    function checkWin(r, c, p) {
+        const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+        for(let [dr, dc] of dirs) {
+            let count = 1;
+            for(let i=1; i<5; i++) {
+                let nr=r+dr*i, nc=c+dc*i;
+                if(nr>=0 && nr<boardSize && nc>=0 && nc<boardSize && board[nr][nc]===p) count++; else break;
+            }
+            for(let i=1; i<5; i++) {
+                let nr=r-dr*i, nc=c-dc*i;
+                if(nr>=0 && nr<boardSize && nc>=0 && nc<boardSize && board[nr][nc]===p) count++; else break;
+            }
+            if(count >= 5) return true;
+        }
+        return false;
+    }
+
+    function toggleMode() {
+        isPVE = !isPVE;
+        document.getElementById('mode-btn').innerText = `模式：${isPVE ? '電腦對戰' : '雙人對戰'}`;
+        resetBoard();
+    }
+
+    function resetGame() { resetBoard(); }
+    
+    function resetBoard() {
+        board = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
+        currentPlayer = 1;
+        canPlacePiece = false;
+        drawBoard();
+        statusEl.innerText = "🔴 準備挑戰...";
+        setTimeout(popQuiz, 800);
+    }
+</script>
+</body>
+</html>
